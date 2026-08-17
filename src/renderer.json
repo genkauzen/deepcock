@@ -1,0 +1,138 @@
+document.addEventListener('DOMContentLoaded', () => {
+  const tabs = document.querySelectorAll('.tab');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      tabContents.forEach(tc => tc.classList.remove('active'));
+      document.getElementById(tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  async function loadSettings() {
+    const config = await window.electron.getConfig();
+    document.getElementById('captcha-key').value = config.captchaApiKey || '';
+    document.getElementById('captcha-service').value = config.captchaService || '2captcha';
+    document.getElementById('steam-concurrency').value = config.steamConcurrency || 3;
+    document.getElementById('psn-concurrency').value = config.psnConcurrency || 2;
+    document.getElementById('steam-delay').value = config.steamDelay || 3000;
+    document.getElementById('psn-delay').value = config.psnDelay || 5000;
+    document.getElementById('proxies').value = (config.proxies || []).join('\n');
+  }
+  loadSettings();
+
+  document.getElementById('save-settings').addEventListener('click', async () => {
+    const config = {
+      captchaApiKey: document.getElementById('captcha-key').value.trim(),
+      captchaService: document.getElementById('captcha-service').value,
+      steamConcurrency: parseInt(document.getElementById('steam-concurrency').value) || 3,
+      psnConcurrency: parseInt(document.getElementById('psn-concurrency').value) || 2,
+      steamDelay: parseInt(document.getElementById('steam-delay').value) || 3000,
+      psnDelay: parseInt(document.getElementById('psn-delay').value) || 5000,
+      proxies: document.getElementById('proxies').value.split('\n').filter(p => p.trim())
+    };
+    await window.electron.saveConfig(config);
+    document.getElementById('settings-status').textContent = '✅ Сохранено';
+    setTimeout(() => document.getElementById('settings-status').textContent = '', 3000);
+  });
+
+  async function loadDatabase(platform = null) {
+    const accounts = await window.electron.getAccounts(platform);
+    const tbody = document.getElementById('db-body');
+    if (accounts.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6">Нет аккаунтов</td></tr>';
+      document.getElementById('db-total').textContent = '0';
+      return;
+    }
+    tbody.innerHTML = accounts.map(a => `
+      <tr>
+        <td>${a.id}</td>
+        <td>${a.platform}</td>
+        <td>${a.email}</td>
+        <td>${a.password}</td>
+        <td><span style="color:${a.status === 'success' ? '#4ade80' : '#ff6b6b'}">${a.status}</span></td>
+        <td>${new Date(a.created_at).toLocaleString()}</td>
+      </tr>
+    `).join('');
+    document.getElementById('db-total').textContent = accounts.length;
+  }
+  loadDatabase();
+
+  document.getElementById('db-refresh').addEventListener('click', () => loadDatabase());
+
+  document.getElementById('db-export-csv').addEventListener('click', async () => {
+    const result = await window.electron.exportDatabase('csv');
+    if (result.success) alert(`Экспортировано в ${result.filePath}`);
+  });
+
+  document.getElementById('db-export-json').addEventListener('click', async () => {
+    const result = await window.electron.exportDatabase('json');
+    if (result.success) alert(`Экспортировано в ${result.filePath}`);
+  });
+
+  document.getElementById('db-clear').addEventListener('click', async () => {
+    // Очистка через главный процесс (можно добавить IPC)
+    if (confirm('Удалить все аккаунты?')) {
+      await window.electron.clearDatabase();
+      loadDatabase();
+    }
+  });
+
+  document.getElementById('steam-start').addEventListener('click', async () => {
+    const count = parseInt(document.getElementById('steam-count').value) || 10;
+    const btn = document.getElementById('steam-start');
+    const stopBtn = document.getElementById('steam-stop');
+    btn.disabled = true;
+    stopBtn.disabled = false;
+    document.getElementById('status').textContent = '🔄 Регистрация Steam...';
+    await window.electron.startRegistration({ platform: 'steam', count });
+  });
+
+  document.getElementById('steam-stop').addEventListener('click', async () => {
+    await window.electron.stopRegistration();
+    document.getElementById('steam-start').disabled = false;
+    document.getElementById('steam-stop').disabled = true;
+    document.getElementById('status').textContent = '⏹ Остановлено';
+  });
+
+  document.getElementById('psn-start').addEventListener('click', async () => {
+    const count = parseInt(document.getElementById('psn-count').value) || 5;
+    const btn = document.getElementById('psn-start');
+    const stopBtn = document.getElementById('psn-stop');
+    btn.disabled = true;
+    stopBtn.disabled = false;
+    document.getElementById('status').textContent = '🔄 Регистрация PSN...';
+    await window.electron.startRegistration({ platform: 'psn', count });
+  });
+
+  document.getElementById('psn-stop').addEventListener('click', async () => {
+    await window.electron.stopRegistration();
+    document.getElementById('psn-start').disabled = false;
+    document.getElementById('psn-stop').disabled = true;
+    document.getElementById('status').textContent = '⏹ Остановлено';
+  });
+
+  window.electron.onProgress((data) => {
+    const prefix = data.platform === 'steam' ? 'steam' : 'psn';
+    document.getElementById(`${prefix}-success`).textContent = data.success || 0;
+    document.getElementById(`${prefix}-errors`).textContent = data.error || 0;
+    document.getElementById(`${prefix}-active`).textContent = data.current || 0;
+    const log = document.getElementById(`${prefix}-log`);
+    log.textContent += `[${new Date().toLocaleTimeString()}] ${data.status || '...'}\n`;
+    log.scrollTop = log.scrollHeight;
+  });
+
+  window.electron.onComplete((data) => {
+    const prefix = data.platform === 'steam' ? 'steam' : 'psn';
+    document.getElementById(`${prefix}-start`).disabled = false;
+    document.getElementById(`${prefix}-stop`).disabled = true;
+    document.getElementById('status').textContent = '✅ Готово';
+    const log = document.getElementById(`${prefix}-log`);
+    log.textContent += `\n✅ Завершено. Успешно: ${data.success}, Ошибок: ${data.failed}\n`;
+    loadDatabase(data.platform);
+  });
+
+  window.electron.onDbUpdated(() => loadDatabase());
+});

@@ -1,0 +1,51 @@
+{
+  "name": "triumph-autoreg-win",
+  "version": "1.0.0",
+  "description": "Windows GUI для авторегистрации Steam и PSN",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable",
+    "build:installer": "electron-builder --win nsis"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^8.4.1",
+    "axios": "^1.7.2",
+    "electron": "^28.0.0",
+    "electron-store": "^8.1.0",
+    "https-proxy-agent": "^7.0.6",
+    "puppeteer": "^21.0.0",
+    "puppeteer-cluster": "^0.23.0",
+    "puppeteer-extra": "^3.3.0",
+    "puppeteer-extra-plugin-stealth": "^2.11.0",
+    "socks-proxy-agent": "^8.0.4",
+    "sqlite3": "^5.1.7",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^24.6.3"
+  },
+  "build": {
+    "appId": "com.triumph.autoreg",
+    "productName": "Triumph AutoReg",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "node_modules/**/*",
+      "!node_modules/.bin",
+      "!src/**/*.test.js"
+    ],
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

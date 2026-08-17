@@ -1,0 +1,20 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electron', {
+  getConfig: () => ipcRenderer.invoke('get-config'),
+  saveConfig: (config) => ipcRenderer.invoke('save-config', config),
+  getAccounts: (platform) => ipcRenderer.invoke('get-accounts', platform),
+  startRegistration: (data) => ipcRenderer.invoke('start-registration', data),
+  stopRegistration: () => ipcRenderer.invoke('stop-registration'),
+  showSaveDialog: (options) => ipcRenderer.invoke('show-save-dialog', options),
+  exportDatabase: (format) => ipcRenderer.invoke('export-database', format),
+  onProgress: (callback) => {
+    ipcRenderer.on('registration-progress', (event, data) => callback(data));
+  },
+  onComplete: (callback) => {
+    ipcRenderer.on('registration-complete', (event, data) => callback(data));
+  },
+  onDbUpdated: (callback) => {
+    ipcRenderer.on('db-updated', (event, data) => callback(data));
+  }
+});
